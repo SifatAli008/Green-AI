@@ -1,0 +1,42 @@
+\section{Implementation and Reproducibility}
+\label{implementation-and-reproducibility}
+ 
+\subsection{Software Infrastructure and Environment}
+ 
+The system was implemented and evaluated using Kaggle Notebooks, a cloud-based Jupyter environment with access to NVIDIA T4 GPUs. The primary runtime environment used Python 3.9 together with established machine learning libraries. PyTorch 2.0 or later was utilized for deep learning model development, training, and inference \cite{paszke2019pytorch}. Transformers 4.30 or later facilitated model loading and inference. FAISS 1.7.4 or later enabled vector similarity search \cite{yang2025rag}. Sentence-Transformers 2.2 or later generated semantic embeddings \cite{gu2020pubmedbert}. Draft GPU sessions on Kaggle provided up to two T4 GPUs with 15 GB of memory each, 30 GB of RAM, and 57.6 GB of local disk for the energy and carbon experiments described below.
+ 
+\subsection{Model and Library Sources}
+ 
+Language models were sourced from the Hugging Face Model Hub. The experiments used Gemma-2-2B-it (available at as the SLM, and Llama-2-7B-chat served as the LLM \cite{amugongo2025retrieval}. Sentence-Transformers, specifically all-MiniLM-L6-v2, was employed as the embedding model. This model generates 384-dimensional semantic vectors and was selected for computational efficiency, modest memory requirements, and broad availability in resource-constrained environments. Future work will compare performance with biomedical-specific embedding models, including MedCPT, PubMedBERT, and BGE-med \cite{lee2020biobert, gu2020pubmedbert}.
+ 
+Vector search infrastructure was implemented using FAISS (Facebook AI Similarity Search). The index utilized the IndexFlatIp configuration with inner product similarity to enable efficient similarity search and clustering \cite{yang2025rag, xiong2024rag}.
+ 
+\subsection{Corpus Construction Pipeline}
+ 
+Corpus construction followed established practices for biomedical knowledge base development \cite{pezoulas2023generative, zamzmi2025smd}. Semantic chunking was applied to preserve clinical context and maintain logical relationships between medical concepts \cite{alsentzer2019clinicalbert}. The final corpus contained 556 semantic chunks indexed using FAISS IndexFlatIP, with embeddings and queries L2-normalized so that inner product search corresponds to cosine similarity. Retrieval latency ranged between 50 and 100 milliseconds per query \cite{zakka2023retrieval}.
+ 
+\subsection{Code, Data, and Reproducibility}
+ 
+All resources used in this study are publicly available, including PubMed articles \cite{krithara2023bioasq}, clinical guidelines from FDA, NICE, and NHS \cite{labkoff2024aicds}, and Hugging Face models (Gemma-2-2B-it, Llama-2-7B-chat, and all-MiniLM-L6-v2) \cite{xiong2024rag, lee2020biobert}. Code, corpus-construction scripts, evaluation scripts, prompt templates, and aggregated evaluation logs are maintained in the project repository. The \texttt{requirements.txt} file specifies core dependencies (Python 3.9, PyTorch $\geq$2.0, Transformers $\geq$4.30, FAISS $\geq$1.7.4, Sentence-Transformers $\geq$2.2). Random seed 42 was used for numpy, torch, and CUDA where applicable. A frozen commit hash, dataset manifest, and reproduction instructions are available upon reasonable request.
+
+Pipeline scripts cover chunking, embedding generation, index construction, inference, routing, and F1 scoring. The routing module is rule-based (not learned), using lexical features (word length, complexity, word count, entity count); implementation consistency on the 240-query definition set is reported in Appendix~\ref{app:routing-consistency}. Generation used max\_new\_tokens 64--128, temperature 0.7, top\_p $\geq$ 0.9, retrieval top-$k=3$, FP16 precision, and greedy decoding as described in Section~\ref{methodology}.
+
+\subsection{Experimental Trial Implementation}
+ 
+Experimental trials followed the 2$\times$2 factorial design described in \cite{tam2024quest}. The design required 12 experimental runs covering four conditions corresponding to two models and two retrieval configurations. Each condition was evaluated using three medical queries.
+ 
+For each trial the system recorded token count, inference latency in seconds, and percentage improvement due to retrieval augmentation \cite{amugongo2025retrieval}. \textbf{Answer quality F1} was computed as the harmonic mean of precision and recall based on token level overlap between generated responses and reference answers prepared for the evaluation set. The scoring script and example annotations are included in the reproducibility package.
+ 
+Latency and token counts were averaged across the three queries for each condition. Retrieval improvement percentages were then calculated and performance tables were generated to support comparative analysis \cite{xiong2024rag}.
+ 
+Hallucination detection was incorporated using evidence grounded claim verification \cite{asgari2022hallucination, nishizaki2025reducing}. Generated claims were classified as supported, contradicted, or unsupported relative to retrieved evidence \cite{xu2025mega}. Energy consumption metrics were also recorded using established carbon accounting practices for AI systems \cite{ren2024reconciling, dauner2025ai}.
+ 
+\subsection{Energy and Carbon Accounting}
+ 
+Energy and carbon measurements were obtained using hardware-level telemetry rather than a token-based proxy. For each strategy, batches of 20 clinical queries were executed and repeated across ten independent trials on NVIDIA T4 GPUs; total GPU energy was read from NVML and normalized to kWh per query. \textbf{Scope:} reported figures are GPU-scoped only and exclude data-center overhead. Carbon emissions were derived as $E_{\mathrm{query}} \times \gamma_{\mathrm{grid}}$ with $\gamma_{\mathrm{grid}} = 0.385$\,kg CO\textsubscript{2}e/kWh~\cite{patterson2021carbon,strubell2019energy,epa2023egrid}. Results are reported in Section~\ref{results:eie}; \textbf{kWh/query} is the primary grid-independent metric~\cite{ren2024reconciling}.
+ 
+\subsection{Privacy and Compliance}
+ 
+The system architecture processes all queries locally and avoids transmission of data to external cloud services. This design supports alignment with HIPAA and GDPR requirements through on-premises deployment \cite{jonnagaddala2025privacy, jmir2024generative}. Queries and responses are processed locally. The audit log records system interactions, including query hashes, retrieved chunk identifiers, and verification outcomes, while avoiding storage of protected health information \cite{labkoff2024aicds, carlini2021memorization}. 
+ 
+Concrete steps toward full HIPAA, GDPR, and NHS-DTAC readiness are described in Methodology Phase~5 (Section~\ref{phase5}). The current system provides on-premises deployment, local processing, claim verification, and audit logging; formal compliance verification remains planned.

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+
+# LaTeX build
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.bbl
+*.blg
+
+# Large benchmark artifacts (regenerate from scripts)
+GreenPaper_Kaggle_Benchmarks/LLM_Judge/
+GreenPaper_Kaggle_Benchmarks/result/
+GreenPaper_Kaggle_Benchmarks/vast_l4_results/
+GreenPaper_Kaggle_Benchmarks/fathfullness/
+**/bench_final_predictions.json
+GreenPaper_Kaggle_Benchmarks/benchmark_results_all_predictions*.csv
+GreenPaper_Kaggle_Benchmarks/benchmark_results_all_predictions*.json
+GreenPaper_Kaggle_Benchmarks/*benchmark_results_all.json
+*.zip
+*.pdf
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Model / index caches (use kaggle_working paths in repo; skip multi-GB copies)
+*.pt
+*.bin
+**/hub/

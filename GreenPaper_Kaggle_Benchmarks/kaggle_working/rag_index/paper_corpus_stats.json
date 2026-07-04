@@ -1,0 +1,13 @@
+{
+  "n_documents": 115,
+  "n_pubmed_documents": 112,
+  "n_guideline_documents": 3,
+  "n_guideline_chunks": 13,
+  "n_chunks_before_trim": 556,
+  "chunk_tokens": 512,
+  "overlap_tokens": 100,
+  "overlap_ratio": 0.1953,
+  "chunking": "sliding_token_windows_512_100",
+  "trimmed_to_target": 556,
+  "n_chunks": 556
+}

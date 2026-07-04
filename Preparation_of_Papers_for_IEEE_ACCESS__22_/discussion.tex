@@ -1,0 +1,57 @@
+\section{Discussion}
+\label{discussion}
+
+This section interprets the results (Section~\ref{results}) in relation to the three research questions, discusses implications for deployment, and outlines study limitations.
+
+\subsection{Addressing Research Question 1: Efficiency Quality Trade off}
+
+\textbf{Open benchmarks as primary quality evidence.}
+On the open benchmarks (Table~\ref{tab:answer-quality}, $n{=}9{,}090$ per configuration), RAG effects were mixed: MMLU-Med improved for the LLM (+18.5\%; 0.421$\rightarrow$0.499), whereas PubMedQA label accuracy decreased for both models ($-$4.2\% SLM, $-$5.5\% LLM). Section~\ref{results:error-analysis} analyzes plausible causes, including corpus--benchmark mismatch and response-format effects. A supplementary three-query token F1 exemplar ($n{=}3$) is reported only in the limitations below and must not be interpreted as primary quality evidence.
+
+\textbf{Infrastructure and energy.}
+Under Context~A and Context~B, the SLM required substantially less VRAM, lower single-query latency, and lower NVML-measured energy than the LLM (Tables~\ref{tab:eie-infrastructure} and~\ref{tab:energy-carbon}). RAG added less than 2\% mean GPU energy relative to NoRAG within each model class.
+
+RQ1 is therefore \textbf{partially answered}: SLM+RAG demonstrates lower measured resource use on T4 GPUs with comparable automated faithfulness scores; however, open benchmark quality gains are inconsistent, and the three query token-F1 result is illustrative only.
+
+\subsection{Addressing Research Question 2: Hallucination Prevention}
+
+Automated faithfulness scores (Table~\ref{tab:answer-quality}) average 47.2\% for SLM+RAG and 47.8\% for LLM+RAG, both within the partial support rubric band (40--55). Because NoRAG faithfulness scoring was not completed, a quantitative RAG-vs.-NoRAG grounding comparison is \textbf{not reported}. LLM as judge RAG vs.NoRAG deltas were negligible in effect size (Figure~\ref{fig:llm-judge-scores}).
+
+The Phase~4 claim verifier (supported/contradicted \\ /unsupported) is implemented as a design component, but end-to-end blocking rates were not measured. RQ2 is therefore \textbf{partially answered}, addressing only the absolute RAG faithfulness levels. Broader safety conclusions require NoRAG baselines, claim verifier benchmarks, and Phase~5 clinician review.
+
+\subsection{Addressing Research Question 3: Privacy, Sustainability, and Compliance}
+
+The system processes queries locally without cloud APIs; audit logging and PHI-minimizing design are intended to support HIPAA/GDPR \emph{readiness}, though formal compliance is not certified and no real-world clinical safety or effectiveness results are presented. EIE reporting keeps these operational metrics separate from the clinical results tables (Section~\ref{results:eie}).
+
+\textbf{Routing.}
+The router is rule based. Perfect agreement on the 240 query definition set is reported only as an \textbf{implementation consistency check} (Appendix~\ref{app:routing-consistency}), not as routing accuracy or held-out validation. The primary behavioral evidence is provided by the Q1--Q12 split (68\% routed to the SLM, 24\% to the LLM, and $\approx$8\% to a fallback defaulting to the LLM), along with end to end latency under concurrent load.
+
+GPU memory under concurrent load remained stable, with a peak of 14.28--14.37\,GB (Table~\ref{tab:eie-infrastructure}). Scaling from 5 to 10 users increased latency by approximately 2.24$\times$.
+
+\subsection{Implications for Clinical AI Deployment}
+
+These results indicate that resource-constrained sites may consider SLM+RAG deployments due to their 4\,GB footprint and lower NVML measured energy use, while privacy sensitive institutions may benefit from on premise processing. For sustainability reporting, measured kWh should serve as the primary, grid independent metric, with derived carbon figures reported alongside the stated $\gamma_{\mathrm{grid}}$ value. Regulatory deployment pathways still require Phase~5 clinician validation. Automated scores alone do not constitute clinical approval, and this manuscript does not claim safety for validated bedside deployment.
+
+\subsection{Comparison with Prior Work}
+
+This study contributes SLM--LLM comparisons under hybrid retrieval, NVML-based energy measurement, and an explicit EIE decomposition, alongside a mixed pattern of open-benchmark outcomes. Prior RAG work has often emphasized accuracy alone, without joint infrastructure and cost reporting~\cite{yang2025rag,ren2024reconciling}.
+
+\subsection{Retrieval-Augmented Generation: Common Failure Modes and Mitigations}
+
+Strong gold-subset retrieval performance (Recall@3 $=0.891$, MRR $=0.967$) did not consistently translate into improved downstream benchmark accuracy. This outcome is consistent with retrieval noise and task format effects, such as the mismatch between PubMedQA's terse label accuracy and the models' more verbose generations. Potential mitigations include curated corpora, hybrid retrieval, faithfulness scoring, and the planned claim verification pipeline.
+
+\subsection{Limitations and Future Work}
+
+\textbf{Two evaluation contexts for F1 and accuracy.} The distinction between the curated set ($n{=}3$) and the open benchmarks ($n{=}9{,}090$) must remain explicit throughout, as the two are not directly comparable. The three query token-F1 experiment (SLM+RAG 0.6101 vs.\ LLM+RAG 0.4548 vs.\ hybrid 0.5667 under Context~B) is illustrative only and should not support strong quality conclusions; readers should note the $n{=}3$ warning if token F1 is displayed.
+
+\textbf{Clinical validation.} Clinical validation by practicing physicians (Phase~5) is planned as follow up work; this manuscript does not present real world clinical safety or effectiveness results.
+
+\textbf{Automated judges.} Qwen2.5-7B-Instruct is used to score faithfulness and clinical quality; these scores serve as within-run proxies and do not constitute clinician validation.
+
+\textbf{Faithfulness and Phase~4.} NoRAG faithfulness evaluation remains pending, and claim-verifier blocking rates have not yet been quantified.
+
+\textbf{Routing generalization.} Held out routing evaluation and learned routers fall outside the scope of the current rule-based design.
+
+\textbf{Corpus scope.} The corpus of 115 documents and 556 chunks spans six clinical domains but does not cover the full breadth of clinical medicine.
+
+Future work will include Phase~5 clinician review, completion of the NoRAG faithfulness evaluation, expanded benchmark coverage, corpus updates, and prospective deployment studies.

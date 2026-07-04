@@ -1,0 +1,27 @@
+{
+  "description": "115-document corpus aligned with IEEE Access paper (112 PubMed + 3 guidelines).",
+  "chunk_tokens": 512,
+  "overlap_tokens": 100,
+  "target_chunks": 556,
+  "guidelines": [
+    {
+      "doc_id": "guideline_fda_diabetes",
+      "title": "FDA — Type 2 diabetes pharmacotherapy overview",
+      "section": "FDA",
+      "url": "https://www.fda.gov/consumers/womens-health-topics/diabetes"
+    },
+    {
+      "doc_id": "guideline_nice_hypertension",
+      "title": "NICE NG136 — Hypertension in adults",
+      "section": "NICE",
+      "url": "https://www.nice.org.uk/guidance/ng136"
+    },
+    {
+      "doc_id": "guideline_nhs_hypertension",
+      "title": "NHS — High blood pressure (hypertension)",
+      "section": "NHS",
+      "url": "https://www.nhs.uk/conditions/high-blood-pressure/"
+    }
+  ],
+  "pubmed_source": "pubmed_qa pqa_labeled — 112 unique pubid documents (deterministic sort)"
+}

@@ -1,0 +1,40 @@
+LLMs have demonstrated strong capabilities in medical question answering (MQA) and related clinical NLP tasks, achieving competitive performance across a variety of benchmark settings~\cite{singhal2025toward}. Realizing this potential in practice, however, requires balancing answer quality with computational efficiency~\cite{singhal2025toward}. Although LLMs can generate high quality responses, they typically demand substantial computational resources, including high-capacity GPUs, memory footprints exceeding 14\,GB, and considerable energy consumption. These requirements restrict deployment in healthcare environments with limited computational infrastructure, such as rural clinics, edge devices, and resource constrained hospitals.
+
+SLMs offer an alternative by operating with fewer parameters and lower computational demands~\cite{xiong2024rag,amugongo2025retrieval}.
+ Their reduced resource requirements enable local deployment and improved accessibility, but they often produce shorter or less comprehensive responses, which may limit clinical usefulness. This raises an important research question: can retrieval augmented SLMs narrow the efficiency quality gap relative to LLMs for \emph{benchmark} medical question answering, without claiming validation for clinical deployment?
+
+Sustainability considerations further motivate this investigation~\cite{ren2024reconciling,dauner2025ai}. The energy consumption and carbon emissions associated with model inference generally increase with model size and query volume, making operational efficiency an increasingly important dimension of healthcare AI evaluation. Recent work has accordingly called for reporting resource utilization, energy consumption, and environmental impact alongside traditional clinical performance metrics~\cite{yang2025rag}.
+
+Despite these advances, several important challenges remain. First, RAG does not consistently improve answer quality across medical domains, datasets, and evaluation benchmarks~\cite{yang2025rag}. Second, complexity based routing strategies must balance classification accuracy against latency and computational overhead. Third, ensuring safety and clinical validity requires rigorous clinician evaluation and regulatory assessment prior to real world deployment~\cite{labkoff2024aicds,tam2024quest}. Finally, evidence grounding and faithfulness mitigation remain open challenges that call for explicit baselines and systematic evaluation~\cite{asgari2022hallucination,nishizaki2025reducing}.
+
+\subsection{Research Questions}
+
+Motivated by these challenges, this study addresses the following research questions:
+
+\textbf{RQ1:} Can retrieval augmented small language models achieve benchmark answer quality comparable to larger LLMs on open MQA tasks while reducing GPU energy consumption and infrastructure requirements?
+
+\textbf{RQ2:} To what extent do evidence-based retrieval and verification mechanisms reduce unsupported claims in medical question answering?
+
+\textbf{RQ3:} Can a locally deployable RAG based architecture support patient safety oriented \emph{design principles}, sustainability reporting, and regulatory \emph{readiness planning} within the technical scope of this evaluation (without claiming completed clinical or regulatory validation)?
+
+\subsection{Contributions}
+
+The primary contributions of this study are summarized below.
+
+First, we implement and evaluate a hybrid RAG framework using an SLM  and an LLM  under three configurations: NoRAG, RAG, and rule-based hybrid routing. Primary answer-quality evidence is drawn from open MQA benchmarks ($n{=}9{,}090$ predictions per configuration; Table~\ref{tab:answer-quality}), where RAG effects were dataset-dependent. NVML-based measurements showed that SLM+RAG consumed approximately 2.15$\times$ less energy per query than LLM+RAG (Section~\ref{results:eie}).
+
+Second, we introduce an \textbf{EIE} framework that reports GPU energy consumption, estimated carbon emissions, latency, VRAM utilization, and deployment cost proxies independently of answer-quality metrics (Section~\ref{methodology:eie}; Figure~\ref{fig:eie-framework})~\cite{ren2024reconciling,dauner2025ai,patterson2021carbon,strubell2019energy}. This separation enables transparent evaluation of performance--efficiency trade-offs in medical QA systems.
+
+Third, we report automated faithfulness and LLM-as-judge evaluations using \texttt{Qwen2.5-7B-Instruct} as an independent evaluator. RAG configurations achieved faithfulness scores of approximately 47--48\%, corresponding to a partial-support range, whereas NoRAG faithfulness and quantitative claim-verifier blocking rates remain subjects of ongoing investigation.
+
+Fourth, we present an on-premise architecture designed for HIPAA/GDPR-\emph{aligned design}, incorporating local processing, audit logging, and PHI-minimizing design principles. No clinical effectiveness, deployment-safety, or formal regulatory certification is claimed; Phase~5 clinician assessment and compliance verification are planned future work.
+
+Finally, we provide a reproducible evaluation framework comprising 115 biomedical sources, 556 semantic chunks, hybrid FAISS+BM25 retrieval, routing and load-testing on a 12-query workload set, and frozen NVML energy-measurement trials. A separate three-query factorial exemplar set ($n{=}3$) is used only to demonstrate the token-F1 scoring protocol and is not treated as primary quality evidence.
+
+\subsection{Methodology Overview}
+
+We adopt a structured five-phase methodology~\cite{tam2024quest}: corpus construction and model selection (Phase~1), factorial and routing evaluation (Phase~2), hybrid RAG implementation (Phase~3), safety verification design (Phase~4), and planned clinician validation (Phase~5). Full details appear in Section~\ref{methodology}.
+
+\subsection{Paper Organization}
+
+The remainder of this paper is organized as follows. Section~II reviews related work. Section~III presents the methodology. Section~IV describes the implementation and reproducibility framework. Section~V reports experimental results, including the proposed EIE assessment. Section~VI discusses implications and limitations. Finally, Section~VII concludes the paper and outlines future directions.

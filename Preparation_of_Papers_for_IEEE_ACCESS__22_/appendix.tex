@@ -1,0 +1,9 @@
+\appendices
+\section{Routing Implementation Consistency Check}
+\label{app:routing-consistency}
+
+Query routing is implemented using a rule-based heuristic instead of a learned classifier. To verify alignment between implementation and specification, the heuristic was applied to a definition set of 240 queries. This set was constructed by expanding 12 core evaluation queries into 20 lexical and syntactic paraphrases each. Labels for this set were generated using the same rule criteria as the heuristic, ensuring that the label generation process and the classifier remain definitionally aligned.
+
+On this definition set, classifier outputs matched the rule-generated labels on all 240 queries. We report this as an \textbf{implementation consistency check}, not as routing accuracy or held-out predictive performance. The primary routing evidence in the main text is behavioral: the Q1--Q12 workload split (68\% routed to the SLM, 24\% to the LLM, and $\approx$8\% to a fallback defaulting to the LLM) together with end-to-end latency under concurrent load (Section~\ref{sec:routing-discussion}).
+
+Evaluation of routing on held-out queries from sources external to the definition set is scheduled for Phase~5 clinical validation (Section~\ref{phase5}).

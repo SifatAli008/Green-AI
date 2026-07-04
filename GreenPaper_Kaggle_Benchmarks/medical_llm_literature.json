@@ -1,0 +1,42 @@
+{
+  "description": "Plan B literature benchmarks (MedQA / PubMedQA from published reports). Update scores when citing a specific paper version.",
+  "sources_note": "Scores are approximate public benchmarks for table discussion; verify against the cited paper before submission.",
+  "models": [
+    {
+      "name": "Med-PaLM 2",
+      "medqa_accuracy": 0.863,
+      "pubmedqa_accuracy": null,
+      "notes": "USMLE-style MedQA; literature benchmark"
+    },
+    {
+      "name": "MedGemma",
+      "medqa_accuracy": null,
+      "pubmedqa_accuracy": null,
+      "notes": "Report from Google MedGemma technical report / HF card when available"
+    },
+    {
+      "name": "Meditron-7B",
+      "medqa_accuracy": 0.529,
+      "pubmedqa_accuracy": null,
+      "notes": "Meditron family; verify split and prompt"
+    },
+    {
+      "name": "BioMistral-7B",
+      "medqa_accuracy": 0.574,
+      "pubmedqa_accuracy": null,
+      "notes": "BioMistral benchmark tables"
+    },
+    {
+      "name": "OpenMedLM",
+      "medqa_accuracy": null,
+      "pubmedqa_accuracy": null,
+      "notes": "Fill from OpenMedLM paper when fixed"
+    }
+  ],
+  "internal_system_labels": {
+    "SLM_RAG": "SLM-RAG (this work)",
+    "LLM_RAG": "LLM-RAG (this work)",
+    "SLM_NoRAG": "SLM-NoRAG",
+    "LLM_NoRAG": "LLM-NoRAG"
+  }
+}

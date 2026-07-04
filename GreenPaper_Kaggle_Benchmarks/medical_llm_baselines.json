@@ -1,0 +1,24 @@
+{
+  "description": "Plan A — optional HF baseline runs (same benchmarks, override models via env).",
+  "usage": "GP_MODEL_SLM=... GP_MODEL_LLM=... python eval_benchmarks.py --benchmark pubmedqa --max_items 500",
+  "baselines": [
+    {
+      "name": "BioMistral-7B",
+      "GP_MODEL_SLM": "BioMistral/BioMistral-7B-GPTQ",
+      "GP_MODEL_LLM": "BioMistral/BioMistral-7B-GPTQ",
+      "notes": "Requires HF_TOKEN; adjust id to your checkpoint"
+    },
+    {
+      "name": "Meditron-7B",
+      "GP_MODEL_SLM": "epfl-llm/meditron-7b",
+      "GP_MODEL_LLM": "epfl-llm/meditron-7b",
+      "notes": "Meditron family"
+    },
+    {
+      "name": "MedGemma",
+      "GP_MODEL_SLM": "google/medgemma-4b-it",
+      "GP_MODEL_LLM": "google/medgemma-4b-it",
+      "notes": "Google MedGemma instruct; verify HF gating"
+    }
+  ]
+}

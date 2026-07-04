@@ -1,0 +1,74 @@
+\documentclass{ieeeaccess}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{courier}
+\makeatletter
+\def\ttfamily{\fontfamily{pcr}\fontseries{m}\selectfont}
+\makeatother
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\graphicspath{{./}}
+\usepackage{textcomp}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{array}
+\usepackage{bm}
+\usepackage[hidelinks,bookmarks=false]{hyperref}
+
+\vol{14}
+\year{2026}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+% Include title, author, and related information
+\input{title}
+
+% Include abstract
+\input{abstract}
+
+% Include keywords
+\input{keywords}
+
+\titlepgskip=-15pt
+
+\maketitle
+
+\section{Introduction}
+\label{sec:introduction}
+\input{introduction}
+
+\section{Related Work}
+\label{sec:relatedwork}
+\input{relatedwork}
+
+% Include methodology section
+\input{methodology}
+
+% Include implementation section
+\input{implementation}
+
+% Include results section
+\input{results}
+
+% Include discussion section
+\input{discussion}
+
+% Include conclusion section
+\input{conclusion}
+
+% Include appendix
+\input{appendix}
+
+\vspace{1em}
+\textit{Disclosure:} The authors used AI tools, including Perplexity Pro, Cursor Pro, Hugginface Pro, and other AI-assisted tools during the preparation of this manuscript.
+
+% Include references
+\input{references}
+
+\EOD
+\end{document}

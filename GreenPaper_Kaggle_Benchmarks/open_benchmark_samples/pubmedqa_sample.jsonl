@@ -1,0 +1,8 @@
+{"id": "sample-pqa-1", "question": "Does metformin improve glycemic control in type 2 diabetes?", "answer": "yes"}
+{"id": "sample-pqa-2", "question": "Is smoking associated with higher cardiovascular risk?", "answer": "yes"}
+{"id": "sample-pqa-3", "question": "Does a single blood pressure reading always prove chronic hypertension?", "answer": "no"}
+{"id": "sample-pqa-4", "question": "Are antibiotics indicated for uncomplicated viral upper respiratory infection?", "answer": "no"}
+{"id": "sample-pqa-5", "question": "Is exercise generally recommended as part of lifestyle therapy for many chronic diseases?", "answer": "yes"}
+{"id": "sample-pqa-6", "question": "Can atrial fibrillation be asymptomatic?", "answer": "yes"}
+{"id": "sample-pqa-7", "question": "Is MRI always required to diagnose uncomplicated acute otitis media in all ages?", "answer": "no"}
+{"id": "sample-pqa-8", "question": "May clinical equipoise exist when evidence for an intervention is uncertain?", "answer": "maybe"}

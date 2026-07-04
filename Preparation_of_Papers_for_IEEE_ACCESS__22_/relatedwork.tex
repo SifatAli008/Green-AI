@@ -1,0 +1,62 @@
+Lee et al.~\cite{lee2020biobert} introduced BioBERT, a BERT-base architecture pre-trained on biomedical corpora that achieved notable improvements in biomedical tasks such as entity recognition and relation extraction. However, the study did not evaluate privacy risks associated with potential PHI data leakage, carbon emissions, or the feasibility of deployment across multiple institutions. Similarly, Gu et al.~\cite{gu2020pubmedbert} proposed PubMedBERT, which was trained exclusively on biomedical corpora and demonstrated consistent performance improvements over general-domain models. Nevertheless, this work did not examine the efficiency of fine-tuning, computational complexity, or the feasibility of federated learning. Alsentzer et al.~\cite{alsentzer2019clinicalbert} released publicly available BERT embeddings pre-trained on MIMIC-III clinical notes and discharge summaries, demonstrating performance improvements on clinical NLP tasks over general-domain embeddings. However, the study did not evaluate the privacy--utility trade-off or the environmental impact of model deployment. Luo et al.~\cite{luo2023biogpt} proposed BioGPT, a domain-specific generative pre-trained transformer for biomedical text generation and mining, demonstrating strong performance across multiple biomedical NLP tasks. The work did not assess hallucination behavior or provide comparisons of carbon impact, both of which are considered in the present study.
+
+Tam et al.~\cite{tam2024quest} proposed the QUEST framework to improve the reliability of evaluation procedures. However, the framework does not provide metrics for evaluating small language models, environmental impact, or regulatory compliance. Asgari et al.~\cite{asgari2022hallucination} introduced a clinician-in-the-loop framework including an error taxonomy, an experimental comparison structure, a clinical safety assessment, and the CREOLA interface for measuring hallucination and omission rates in clinical language model outputs, demonstrating that such errors can pose substantial patient risks. The study did not compare SLM and LLM performance or analyze the environmental cost of model deployment. Toal et al.~\cite{toal2025llm} evaluated AI-based decision making in nephrology, comparing LLM responses to those of over 1000 nephrologists on kidney biopsy decisions and identified risks related to model miscalibration. This work focused on a single clinical domain and did not analyze privacy risks associated with model usage.
+
+Carlini et al.~\cite{carlini2021memorization} demonstrated that large language models may memorize sensitive personal information. Although this work established a foundational understanding of memorization risks, it did not quantify such risks in clinical SLMs or evaluate differential privacy techniques in healthcare settings. Jonnagaddala et al.~\cite{jonnagaddala2025privacy} outlined privacy-preserving strategies for EHR use with LLMs, including deidentification, synthetic data generation, differential privacy, and locally deployed models to support compliance with regulations such as GDPR and HIPAA. However, the work did not quantify the privacy--utility trade-off or examine the feasibility of large-scale federated learning. Fares et al.~\cite{fares2024federated} applied federated learning with local differential privacy and secure aggregation to medical image classification using a modified ResNet architecture (DPResNet), achieving accuracy close to non-private baselines while preserving data confidentiality. The work was limited to imaging tasks and did not compare carbon cost across training and deployment settings. The present study extends privacy and efficiency considerations to clinical natural language processing, evaluating SLM--LLM deployment trade-offs under multi-user query loads alongside lifecycle carbon accounting.
+
+Yang et al.~\cite{yang2025rag} discussed the potential contributions of retrieval-augmented generation to healthcare in terms of equity, reliability, and personalization, while highlighting current limitations and challenges of RAG implementation in medical scenarios. However, the work did not compare the performance of SLM and LLM architectures or examine privacy risks within retrieval databases. Xiong et al.~\cite{xiong2024rag} introduced MIRAGE, a benchmark for systematically evaluating retrieval-augmented generation systems across multiple medical question-answering datasets, examining factors such as retrieval corpus choice, retriever type, and document count. The benchmark did not assess energy or carbon impact, nor did it compare SLM and LLM architectures under a hybrid routing strategy. Amugongo et al.~\cite{amugongo2025retrieval} conducted a systematic review of RAG for LLMs in healthcare, identifying retrieval grounding and hallucination reduction as key benefits, but the review did not compare SLM and LLM architectures under a hybrid routing strategy or report energy efficiency metrics. The present work addresses these limitations through a comparative evaluation of SLM--LLM trade-offs, retrieval grounding, and deployment efficiency.
+
+Learned routing strategies---including classifier-based query routers and reinforcement-learning approaches that optimize latency--quality trade-offs---offer an alternative to the rule-based heuristic used here. Such methods can adapt to shifting query distributions but require labeled routing data, held-out evaluation, and additional training overhead. We treat learned routing as out of scope for the current study and focus instead on a transparent, reproducible rule-based baseline with an explicit implementation consistency check (Appendix~\ref{app:routing-consistency}). Medical-domain embedding alternatives to \texttt{all-MiniLM-L6-v2} (MedCPT and PubMedBERT-based retrievers) are likewise left for future ablation.
+
+Labkoff et al.~\cite{labkoff2024aicds} outlined best practices for AI-driven clinical decision support that emphasize transparency and clinician involvement. However, the study did not include quantitative transparency metrics or federated governance mechanisms. Zamzmi et al.~\cite{zamzmi2025smd} introduced the SMD Scorecard for evaluating synthetic data quality, but the work did not consider environmental benchmarks or multi-center validation. Pezoulas et al.~\cite{pezoulas2023generative} reviewed generative techniques for medical data synthesis, yet the study did not examine SLM validation or clinical risk assessment.
+
+A systematic review of studies published between 2019 and 2025 indicates that biomedical AI research has focused primarily on clinical performance, with limited head-to-head SLM--LLM evaluation of carbon footprint, scalability, and regulatory compliance. Table~\ref{tab:literature} summarizes representative work by theme and the gaps addressed in this study.
+
+\subsection{Research Gaps Identified}
+\label{subsec:researchgaps}
+
+Table~\ref{tab:literature} summarizes themes, representative studies, and the main gaps addressed by this work. The following numbered gaps elaborate the same limitations at a high level without repeating the table row by row.
+
+\textbf{Gap 1:} Comparative evaluations remain limited across clinical accuracy, privacy protection, environmental sustainability, and regulatory compliance. Only a small number of recent Q1 studies have directly compared SLM and LLM systems across these dimensions.
+
+\textbf{Gap 2:} Most studies rely on benchmark evaluations rather than real-world deployment scenarios. Methods for integrating SLMs and LLMs into clinical workflows or privacy-preserving federated evaluations using synthetic data across multiple institutions remain insufficiently explored.
+
+\textbf{Gap 3:} Scalable federated learning across multiple institutions has not been extensively validated in clinical NLP settings, particularly with mechanisms that preserve differential privacy during collaborative training.
+
+\textbf{Gap 4:} Environmental sustainability assessments for clinical AI systems remain limited. Few studies provide lifecycle carbon footprint analysis that includes training, inference, and deployment phases.
+
+\textbf{Gap 5:} Integrated frameworks combining differential privacy, SLM-based federated learning, and evaluation of synthetic medical datasets remain underdeveloped. Existing SMD evaluation approaches have not been combined with DP-SLM architectures.
+
+\begin{table*}[t]
+\centering
+\caption{Grouped summary of related work (selected papers, 2024--2025) by thematic similarity}
+\label{tab:literature}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{0.95}
+\begin{tabularx}{\textwidth}{p{2.7cm}p{3.1cm}XX}
+\toprule
+\textbf{Theme} & \textbf{Representative studies} & \textbf{What they contribute} & \textbf{What remains missing (gap)} \\
+\midrule
+Evaluation, governance, and real-world risk & Tam~\cite{tam2024quest}, Labkoff~\cite{labkoff2024aicds}, Toal~\cite{toal2025llm}, Singhal~\cite{singhal2025toward} &
+Evaluation frameworks and governance guidance; evidence of real-world clinical risk and decision-support limitations. &
+Limited SLM--LLM head-to-head comparisons; minimal energy and carbon reporting; incomplete privacy quantification and regulatory readiness evidence. \\
+\midrule
+Privacy, federated learning, and synthetic data & Jonnagaddala~\cite{jonnagaddala2025privacy}, Fares~\cite{fares2024federated}, Zamzmi~\cite{zamzmi2025smd} &
+Privacy-preserving NLP methods, federated learning approaches, and standardized evaluation of synthetic medical data. &
+Limited end-to-end RAG integration; limited clinical QA benchmarking; weak reporting of carbon and latency overhead and scalable multi-center NLP validation. \\
+\midrule
+RAG and SLMs for medical QA reliability & Yang~\cite{yang2025rag}, Xiong~\cite{xiong2024rag}, Xu~\cite{xu2025mega}, Nishizaki~\cite{nishizaki2025reducing}, Amugongo~\cite{amugongo2025retrieval} &
+RAG improves factuality and reduces hallucinations; initial evidence that RAG with SLMs can approach LLM performance for targeted QA tasks. &
+Limited joint evaluation of latency and carbon cost together with retrieval privacy risks; limited workflow coverage beyond QA and limited regulatory readiness evidence. \\
+\midrule
+Sustainability and carbon impact of LLMs & Ren~\cite{ren2024reconciling}, Dauner~\cite{dauner2025ai} &
+Evidence that computational design choices influence emissions and highlight measurement uncertainty in reporting. &
+Few clinical RAG studies jointly report carbon impact with clinical quality and safety metrics; limited standardized carbon accounting for healthcare AI pipelines. \\
+\midrule
+\textbf{Proposed work (this paper)} &
+Unified SLM/LLM benchmarking with hybrid retrieval, NVML-measured EIE (energy, infrastructure, economy) reporting separate from clinical accuracy, automated faithfulness/judge scores, and rule-based routing with explicit design-time validation scope. &
+Addresses gaps by joint reporting of curated and open-benchmark outcomes, GPU-level sustainability metrics, and a phased safety/compliance roadmap (Phase~5 pending). \\
+\bottomrule
+\end{tabularx}
+\end{table*}

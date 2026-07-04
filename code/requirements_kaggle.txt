@@ -1,0 +1,9 @@
+# Kaggle / evaluation pipeline. Install: pip install -r requirements_kaggle.txt
+torch>=2.0
+transformers>=4.30
+sentence-transformers>=2.2
+faiss-cpu>=1.7
+numpy
+pandas
+accelerate>=0.20
+# Optional for 4-bit: bitsandbytes (Linux; may fail on Windows/Kaggle CPU)
