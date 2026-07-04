@@ -11,6 +11,8 @@ pynvml
 tqdm
 numpy
 scipy
-# Optional (script tries unsloth first, falls back to bitsandbytes):
-# unsloth
-# xformers
+
+# Recommended on Vast L4 (~1.5–2× faster 4-bit inference vs bitsandbytes alone):
+#   pip install -U unsloth xformers accelerate
+# Or: python run_vast_l4_benchmarks.py --install_unsloth
+# Env: export USE_UNSLOTH=1   (default in run_vast_l4_benchmarks.py)

@@ -10,7 +10,9 @@ Runs 8 models × 2 configs (NoRAG / RAG) × 3 datasets = 48 jobs with:
 
 Usage (on Vast.ai instance after cloning repo + setting HF_TOKEN):
   cd GreenPaper_Kaggle_Benchmarks
-  pip install -r requirements_vast_l4.txt   # or let --install_deps handle it
+  pip install -r requirements_vast_l4.txt
+  pip install unsloth xformers accelerate   # recommended on L4 (~1.5-2x vs bitsandbytes)
+  export USE_UNSLOTH=1                      # default; set USE_UNSLOTH=0 to force bnb fallback
   python run_vast_l4_benchmarks.py --output_dir ./vast_results --seed 42 --max_items 1000
   # Default: 1000 questions TOTAL per model per config, split across datasets (~334+333+333).
   # Legacy 1000 per dataset (3000 total): add --max_items_per_dataset
@@ -50,6 +52,7 @@ os.environ.setdefault("GP_BENCH_TQDM", "1")
 os.environ.setdefault("RAG_REPAIR_PROMPT", "1")
 os.environ.setdefault("RAG_TOP_K", "3")
 os.environ.setdefault("RAG_CONTEXT_MAX_CHARS", "4500")
+os.environ.setdefault("USE_UNSLOTH", "1")
 
 LOGGER = logging.getLogger("vast_l4")
 
@@ -443,24 +446,86 @@ def verify_l4_gpu(*, meter: Optional[NvmlEnergyMeter] = None, strict: bool = Tru
     return gpu_name
 
 
-def install_deps_if_requested(do_install: bool) -> None:
-    if not do_install:
+def _env_truthy(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
+
+
+def resolve_use_unsloth(cli_no_unsloth: bool) -> bool:
+    """USE_UNSLOTH=1 (default) tries Unsloth first; --no_unsloth or USE_UNSLOTH=0 disables."""
+    if cli_no_unsloth:
+        return False
+    return _env_truthy("USE_UNSLOTH", default=True)
+
+
+def check_unsloth_available() -> Dict[str, Any]:
+    """Import probe for startup diagnostics."""
+    info: Dict[str, Any] = {"available": False, "version": None, "fast_lm": False, "error": None}
+    try:
+        import unsloth  # noqa: F401
+
+        info["available"] = True
+        info["version"] = getattr(unsloth, "__version__", "unknown")
+        from unsloth import FastLanguageModel  # noqa: F401
+
+        info["fast_lm"] = True
+    except Exception as exc:
+        info["error"] = str(exc)
+    return info
+
+
+def verify_unsloth_at_startup(*, use_unsloth: bool, require: bool) -> Dict[str, Any]:
+    info = check_unsloth_available()
+    if use_unsloth and info["available"] and info["fast_lm"]:
+        LOGGER.info(
+            "Unsloth OK (version=%s) — quantization backend: unsloth_4bit (FastLanguageModel).",
+            info["version"],
+        )
+    elif use_unsloth:
+        msg = (
+            f"Unsloth not available ({info.get('error') or 'import failed'}). "
+            "Install: pip install -U unsloth xformers accelerate"
+        )
+        if require:
+            raise RuntimeError(msg)
+        LOGGER.warning("%s Will fall back to bitsandbytes per model load.", msg)
+    else:
+        LOGGER.info("Unsloth disabled (--no_unsloth or USE_UNSLOTH=0); using bitsandbytes.")
+    return info
+
+
+def install_unsloth_deps() -> bool:
+    """Install Unsloth + xformers (recommended on L4)."""
+    import subprocess
+
+    cmd = [sys.executable, "-m", "pip", "install", "-U", "unsloth", "xformers", "accelerate"]
+    LOGGER.info("Installing Unsloth stack: %s", " ".join(cmd))
+    try:
+        subprocess.check_call(cmd)
+    except Exception as exc:
+        LOGGER.error("Unsloth install failed: %s", exc)
+        return False
+    ok = check_unsloth_available()
+    if ok["available"]:
+        LOGGER.info("Unsloth install OK (version=%s).", ok.get("version"))
+        return True
+    LOGGER.error("Unsloth still not importable after pip install: %s", ok.get("error"))
+    return False
+
+
+def install_deps_if_requested(do_install: bool, install_unsloth: bool = False) -> None:
+    if not do_install and not install_unsloth:
         return
     import subprocess
 
-    cmd = [sys.executable, "-m", "pip", "install", "-U", *VAST_L4_DEPS]
-    LOGGER.info("Installing dependencies: %s", " ".join(cmd))
-    subprocess.check_call(cmd)
-    # Unsloth is optional; install separately if desired
-    try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "unsloth", "xformers", "--no-deps"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        LOGGER.info("Optional: unsloth installed.")
-    except Exception:
-        LOGGER.info("Optional: unsloth not installed (will use bitsandbytes fallback).")
+    if do_install:
+        cmd = [sys.executable, "-m", "pip", "install", "-U", *VAST_L4_DEPS]
+        LOGGER.info("Installing dependencies: %s", " ".join(cmd))
+        subprocess.check_call(cmd)
+    if do_install or install_unsloth:
+        install_unsloth_deps()
 
 
 def slugify_model_id(model_id: str) -> str:
@@ -534,38 +599,46 @@ def load_model_for_benchmark(
     *,
     use_unsloth: bool = True,
     use_4bit: bool = True,
+    require_unsloth: bool = False,
 ) -> Tuple[Any, Any, str]:
     """
     Load one model for inference. Returns (model, tokenizer, backend_label).
-    Sets GP_MODEL_SLM so real_model_runner.load_one_model can be used as fallback.
+    Tries Unsloth FastLanguageModel first when USE_UNSLOTH=1 (default).
     """
     os.environ["GP_MODEL_SLM"] = model_id
     os.environ["GP_MODEL_LLM"] = model_id
+    hf_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
 
     if use_unsloth:
         try:
             from unsloth import FastLanguageModel
 
-            LOGGER.info("Loading %s via Unsloth 4-bit...", model_id)
+            LOGGER.info("Using Unsloth 4-bit loading for %s ...", model_id)
             model, tokenizer = FastLanguageModel.from_pretrained(
                 model_name=model_id,
                 max_seq_length=2048,
                 dtype=None,
                 load_in_4bit=use_4bit,
-                token=os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"),
+                token=hf_token,
             )
             FastLanguageModel.for_inference(model)
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
-            return model, tokenizer, "unsloth_4bit"
+            backend = "unsloth_4bit" if use_4bit else "unsloth_fp16"
+            LOGGER.info("Quantization backend: %s | model=%s", backend, model_id)
+            return model, tokenizer, backend
         except Exception as exc:
-            LOGGER.warning("Unsloth load failed for %s: %s — falling back to bitsandbytes.", model_id, exc)
+            msg = f"Unsloth load failed for {model_id}: {exc}"
+            if require_unsloth:
+                raise RuntimeError(msg) from exc
+            LOGGER.warning("%s — falling back to bitsandbytes.", msg)
 
     from real_model_runner import load_one_model
 
-    LOGGER.info("Loading %s via real_model_runner (bitsandbytes 4-bit)...", model_id)
+    LOGGER.info("Quantization backend: bitsandbytes | loading %s via real_model_runner ...", model_id)
     model, tokenizer = load_one_model("slm", use_4bit=use_4bit)
     backend = "bitsandbytes_4bit" if use_4bit else "fp16"
+    LOGGER.info("Quantization backend: %s | model=%s", backend, model_id)
     return model, tokenizer, backend
 
 
@@ -850,7 +923,22 @@ def parse_args() -> argparse.Namespace:
         default="all",
         help="NoRAG,RAG or 'all'.",
     )
-    p.add_argument("--no_unsloth", action="store_true", help="Skip Unsloth; use bitsandbytes only.")
+    p.add_argument("--no_unsloth", action="store_true", help="Skip Unsloth; use bitsandbytes only (overrides USE_UNSLOTH=1).")
+    p.add_argument(
+        "--require_unsloth",
+        action="store_true",
+        help="Fail if Unsloth is missing or model load falls back to bitsandbytes.",
+    )
+    p.add_argument(
+        "--check_unsloth",
+        action="store_true",
+        help="Print Unsloth import probe and exit (python -c alternative).",
+    )
+    p.add_argument(
+        "--install_unsloth",
+        action="store_true",
+        help="pip install -U unsloth xformers accelerate before run.",
+    )
     p.add_argument("--no_4bit", action="store_true", help="Disable 4-bit (may OOM on L4 for 7B+).")
     p.add_argument("--force", action="store_true", help="Re-run jobs even if output CSV exists.")
     p.add_argument("--install_deps", action="store_true", help="pip install required packages before run.")
@@ -943,8 +1031,19 @@ def main() -> int:
             args.output_dir = str(SCRIPT_DIR / "vast_l4_results" / "smoke_test")
         LOGGER.info("SMOKE TEST mode: max_items=10, output_dir=%s", args.output_dir)
 
-    install_deps_if_requested(args.install_deps)
+    install_deps_if_requested(args.install_deps, install_unsloth=args.install_unsloth)
     set_global_seeds(args.seed)
+
+    use_unsloth = resolve_use_unsloth(args.no_unsloth)
+
+    if args.check_unsloth:
+        info = check_unsloth_available()
+        print(json.dumps(info, indent=2))
+        if info["available"]:
+            print("Unsloth OK — run benchmarks with USE_UNSLOTH=1 (default).")
+            return 0
+        print("Unsloth FAILED — run: pip install -U unsloth xformers accelerate")
+        return 1
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -963,6 +1062,7 @@ def main() -> int:
     budget_mode = "per_dataset" if args.max_items_per_dataset else "split_total"
 
     if args.dry_run:
+        verify_unsloth_at_startup(use_unsloth=use_unsloth, require=False)
         LOGGER.info(
             "DRY RUN | %d models × %d datasets × %d configs = %d jobs | seed=%d",
             len(models),
@@ -997,6 +1097,8 @@ def main() -> int:
 
     verify_rag_corpus(rag_index_dir)
 
+    verify_unsloth_at_startup(use_unsloth=use_unsloth, require=args.require_unsloth)
+
     meter = NvmlEnergyMeter(device_index=0)
     verify_l4_gpu(meter=meter, strict=not args.allow_non_l4)
 
@@ -1009,12 +1111,13 @@ def main() -> int:
     )
     LOGGER.info("Output directory: %s", output_dir)
     LOGGER.info(
-        "Seed=%d budget=%s caps=%s total_per_config=%d RAG_TOP_K=%s",
+        "Seed=%d budget=%s caps=%s total_per_config=%d RAG_TOP_K=%s use_unsloth=%s",
         args.seed,
         budget_mode,
         item_caps,
         per_config_total,
         os.environ.get("RAG_TOP_K"),
+        use_unsloth,
     )
     if args.max_items > 0:
         LOGGER.info(
@@ -1058,8 +1161,9 @@ def main() -> int:
 
             model, tokenizer, q_backend = load_model_for_benchmark(
                 model_id,
-                use_unsloth=not args.no_unsloth,
+                use_unsloth=use_unsloth,
                 use_4bit=not args.no_4bit,
+                require_unsloth=args.require_unsloth,
             )
             models_dict = {"slm": (model, tokenizer)}
 
@@ -1115,6 +1219,8 @@ def main() -> int:
                 "item_caps": item_caps,
                 "per_config_total": per_config_total,
                 "budget_mode": budget_mode,
+                "use_unsloth": use_unsloth,
+                "unsloth_probe": check_unsloth_available(),
                 "n_jobs": len(jobs),
                 "gpu": meter.gpu_name,
                 "summaries": summaries,
