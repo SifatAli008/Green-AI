@@ -12,6 +12,8 @@ Usage (on Vast.ai instance after cloning repo + setting HF_TOKEN):
   cd GreenPaper_Kaggle_Benchmarks
   pip install -r requirements_vast_l4.txt   # or let --install_deps handle it
   python run_vast_l4_benchmarks.py --output_dir ./vast_results --seed 42 --max_items 1000
+  # Default: 1000 questions TOTAL per model per config, split across datasets (~334+333+333).
+  # Legacy 1000 per dataset (3000 total): add --max_items_per_dataset
 
 Resume: re-run the same command; completed CSVs are skipped unless --force.
 
@@ -112,10 +114,39 @@ class JobSpec:
     config_name: str
     use_rag: bool
     output_prefix: str
+    max_items: int = 0
 
     @property
     def job_id(self) -> str:
         return f"{self.model['short']}_{self.dataset}_{self.config_name}"
+
+
+def split_item_budget(total: int, n: int) -> List[int]:
+    """Split ``total`` questions evenly across ``n`` datasets (remainder to first buckets)."""
+    if n <= 0:
+        return []
+    if total <= 0:
+        return [0] * n
+    base, rem = divmod(int(total), n)
+    return [base + (1 if i < rem else 0) for i in range(n)]
+
+
+def dataset_item_caps(
+    dataset_names: List[str],
+    max_items: int,
+    *,
+    per_dataset: bool,
+) -> Dict[str, int]:
+    """
+    Default: ``max_items`` is the total per model per config, split across datasets.
+    With ``per_dataset=True``: ``max_items`` applies to each dataset separately.
+    """
+    if not dataset_names:
+        return {}
+    if per_dataset or len(dataset_names) <= 1:
+        return {name: max_items for name in dataset_names}
+    shares = split_item_budget(max_items, len(dataset_names))
+    return {name: cap for name, cap in zip(dataset_names, shares)}
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +599,7 @@ def build_jobs(
     datasets: List[Dict[str, str]],
     configs: List[Dict[str, Any]],
     output_dir: Path,
+    max_items_by_dataset: Dict[str, int],
 ) -> List[JobSpec]:
     jobs: List[JobSpec] = []
     for model in models:
@@ -582,6 +614,7 @@ def build_jobs(
                         config_name=cfg["name"],
                         use_rag=bool(cfg["use_rag"]),
                         output_prefix=str(prefix),
+                        max_items=int(max_items_by_dataset.get(ds["name"], 0)),
                     )
                 )
     return jobs
@@ -610,7 +643,6 @@ def make_run_fn(
 def run_single_job(
     job: JobSpec,
     *,
-    max_items: int,
     seed: int,
     rag_index_dir: Path,
     meter: NvmlEnergyMeter,
@@ -644,8 +676,15 @@ def run_single_job(
         clear_rag_pins()
 
     _set_bootstrap_rng(seed)
-    items = _load_items(job.dataset, "", max_items, seed)
-    LOGGER.info("Loaded n=%d items (max_items=%d, seed=%d)", len(items), max_items, seed)
+    cap = int(job.max_items)
+    items = _load_items(job.dataset, "", cap, seed)
+    LOGGER.info(
+        "Loaded n=%d items (cap=%d for %s, seed=%d)",
+        len(items),
+        cap,
+        job.dataset,
+        seed,
+    )
 
     os.environ["GP_MODEL_SLM"] = job.model["id"]
     model_ids = {
@@ -688,7 +727,7 @@ def run_single_job(
         "dataset_label": job.dataset_label,
         "config": job.config_name,
         "use_rag": job.use_rag,
-        "max_items": max_items,
+        "max_items": cap,
         "subset_seed": seed,
         "n_items": len(items),
         "quantization_backend": quantization_backend,
@@ -774,8 +813,19 @@ def parse_args() -> argparse.Namespace:
         default=str(SCRIPT_DIR / "vast_l4_results"),
         help="Directory for per-job predictions CSV/JSON.",
     )
-    p.add_argument("--seed", type=int, default=42, help="Fixed subset seed (reproducible 1000-q draws).")
-    p.add_argument("--max_items", type=int, default=1000, help="Questions per dataset (0 = full split).")
+    p.add_argument("--seed", type=int, default=42, help="Fixed subset seed (reproducible draws).")
+    p.add_argument(
+        "--max_items",
+        type=int,
+        default=1000,
+        help="Question budget per model per config. Default: split across selected datasets "
+        "(all 3 → ~334+333+333≈1000). Use --max_items_per_dataset for 1000 each (3000 total).",
+    )
+    p.add_argument(
+        "--max_items_per_dataset",
+        action="store_true",
+        help="Apply --max_items to EACH dataset (legacy: 1000×3=3000 per model per config).",
+    )
     p.add_argument(
         "--rag_index_dir",
         type=str,
@@ -819,7 +869,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--smoke_test",
         action="store_true",
-        help="Preflight: force --max_items 10 and default output_dir .../smoke_test (48 jobs × 10 q).",
+        help="Preflight: --max_items 10 split across datasets (~3–4 each job), smoke_test output dir.",
     )
     p.add_argument(
         "--no_energy_reset",
@@ -903,22 +953,39 @@ def main() -> int:
     models = filter_models(args.models, exclude=args.exclude_models)
     datasets = filter_datasets(args.datasets)
     configs = filter_configs(args.configs)
-    jobs = build_jobs(models, datasets, configs, output_dir)
+    item_caps = dataset_item_caps(
+        [d["name"] for d in datasets],
+        args.max_items,
+        per_dataset=args.max_items_per_dataset,
+    )
+    jobs = build_jobs(models, datasets, configs, output_dir, item_caps)
+    per_config_total = sum(item_caps.values())
+    budget_mode = "per_dataset" if args.max_items_per_dataset else "split_total"
 
     if args.dry_run:
         LOGGER.info(
-            "DRY RUN | %d models × %d datasets × %d configs = %d jobs | seed=%d max_items=%d",
+            "DRY RUN | %d models × %d datasets × %d configs = %d jobs | seed=%d",
             len(models),
             len(datasets),
             len(configs),
             len(jobs),
             args.seed,
-            args.max_items,
+        )
+        LOGGER.info(
+            "Question budget (%s): %s → %d per model per config",
+            budget_mode,
+            item_caps,
+            per_config_total,
         )
         if not args.skip_hf_token_check:
             require_hf_token_for_models(models, strict=False)
         for j in jobs:
-            LOGGER.info("  [dry-run] %s -> %s_predictions.csv", j.job_id, j.output_prefix)
+            LOGGER.info(
+                "  [dry-run] %s (n=%d) -> %s_predictions.csv",
+                j.job_id,
+                j.max_items,
+                j.output_prefix,
+            )
         LOGGER.info(
             "MMLU-Med note: dev split may yield <1000 items; document actual n in paper methods."
         )
@@ -941,18 +1008,24 @@ def main() -> int:
         len(jobs),
     )
     LOGGER.info("Output directory: %s", output_dir)
-    LOGGER.info("Seed=%d max_items=%d RAG_TOP_K=%s", args.seed, args.max_items, os.environ.get("RAG_TOP_K"))
+    LOGGER.info(
+        "Seed=%d budget=%s caps=%s total_per_config=%d RAG_TOP_K=%s",
+        args.seed,
+        budget_mode,
+        item_caps,
+        per_config_total,
+        os.environ.get("RAG_TOP_K"),
+    )
     if args.max_items > 0:
         LOGGER.info(
-            "Dataset size note: MMLU-Med dev may contribute fewer than max_items; "
-            "actual n is logged per job."
+            "Note: MMLU-Med dev may return fewer than its cap; actual n is logged per job."
         )
 
     summaries: List[Dict[str, Any]] = []
     manifest_path = output_dir / "campaign_manifest.jsonl"
 
     try:
-        # Group jobs by model so each checkpoint loads once (6 jobs × 1000q, not 48 loads).
+        # Group jobs by model so each checkpoint loads once (6 jobs × ~1000q total per config).
         jobs_by_model: Dict[str, List[JobSpec]] = {}
         for job in jobs:
             jobs_by_model.setdefault(job.model["id"], []).append(job)
@@ -996,7 +1069,6 @@ def main() -> int:
                     try:
                         summary = run_single_job(
                             job,
-                            max_items=args.max_items,
                             seed=args.seed,
                             rag_index_dir=rag_index_dir,
                             meter=meter,
@@ -1039,6 +1111,10 @@ def main() -> int:
             {
                 "seed": args.seed,
                 "max_items": args.max_items,
+                "max_items_per_dataset": args.max_items_per_dataset,
+                "item_caps": item_caps,
+                "per_config_total": per_config_total,
+                "budget_mode": budget_mode,
                 "n_jobs": len(jobs),
                 "gpu": meter.gpu_name,
                 "summaries": summaries,
