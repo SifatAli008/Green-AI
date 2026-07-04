@@ -98,9 +98,20 @@ def ensure_rag_index_env() -> str:
     """
     Pin ``RAG_INDEX_DIR`` + explicit ``RAG_FAISS_INDEX`` / ``RAG_CHUNKS_JSONL`` paths.
 
-    Call before FAISS retrieval so a staged ``/kaggle/working/rag_index`` is always visible
-    to ``_rag_paths()`` even if only the directory was set earlier.
+    If the caller already set valid index/chunks paths (e.g. paper_556 sidecars via
+    ``GP_RAG_PAPER_556``), do **not** overwrite them with default ``index.faiss`` /
+    ``chunks.jsonl`` in the same folder.
     """
+    idx = os.environ.get("RAG_FAISS_INDEX", "").strip()
+    chunks = os.environ.get("RAG_CHUNKS_JSONL", "").strip()
+    if idx and chunks and os.path.isfile(idx) and os.path.isfile(chunks):
+        if not _is_builtin_seed_chunks(chunks):
+            d = os.environ.get("RAG_INDEX_DIR", "").strip() or os.path.dirname(chunks)
+            os.environ["RAG_INDEX_DIR"] = os.path.abspath(d)
+            os.environ.setdefault("RAG_EMBED_MODEL", DEFAULT_RAG_EMBED_MODEL)
+            os.environ["RAG_AUTO_BUILD"] = "0"
+            return os.environ["RAG_INDEX_DIR"]
+
     d = os.environ.get("RAG_INDEX_DIR", "").strip()
     candidates: List[str] = []
     if d:
@@ -217,17 +228,28 @@ class _TransformersMiniLMEmbedder:
         return emb
 
 
+_EMBEDDER_CACHE: Dict[str, Any] = {}
+
+
 def _load_rag_embedder(embed_name: str) -> Any:
-    """Object with ``encode(...)`` for FAISS query vectors."""
+    """Object with ``encode(...)`` for FAISS query vectors (cached per model+device)."""
     device = _rag_embed_device()
+    cache_key = f"{embed_name}|{device}"
+    cached = _EMBEDDER_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
     st_err: Optional[Exception] = None
     try:
         from sentence_transformers import SentenceTransformer
 
         try:
-            return SentenceTransformer(embed_name, device=device)
+            st = SentenceTransformer(embed_name, device=device)
         except TypeError:
-            return SentenceTransformer(embed_name)
+            st = SentenceTransformer(embed_name)
+        _EMBEDDER_CACHE[cache_key] = st
+        print(f"RAG: embedder loaded and cached ({embed_name!r}, device={device!r}).", flush=True)
+        return st
     except Exception as ex:
         st_err = ex
     if not _transformers_embed_stack_ok():
@@ -242,6 +264,7 @@ def _load_rag_embedder(embed_name: str) -> Any:
             f"(sentence-transformers unavailable: {st_err})",
             flush=True,
         )
+        _EMBEDDER_CACHE[cache_key] = emb
         return emb
     except Exception as tf_ex:
         raise RuntimeError(
@@ -958,13 +981,13 @@ def clear_reranker_cache() -> None:
 
 
 def _clear_rag_cache() -> None:
+    """Drop in-memory FAISS corpus only; keep embedder + reranker caches warm."""
     global _RAG_MOCK_FALLBACK_WARNED, LAST_RAG_HITS, LAST_RAG_RANKED_SOURCES, LAST_RAG_DIAGNOSTIC
     _rag_singleton.clear()
     _RAG_MOCK_FALLBACK_WARNED = False
     LAST_RAG_HITS = []
     LAST_RAG_RANKED_SOURCES = []
     LAST_RAG_DIAGNOSTIC = {}
-    clear_reranker_cache()
     try:
         from rag_retrieval import clear_retrieval_caches
 
@@ -1310,13 +1333,13 @@ def _load_faiss_index_into_singleton() -> bool:
     if _rag_singleton.get("key") == cache_key and _rag_singleton.get("index") is not None:
         return True
 
-    clear_reranker_cache()
-    try:
-        from rag_retrieval import clear_retrieval_caches
+    if _rag_singleton.get("key") != cache_key:
+        try:
+            from rag_retrieval import clear_retrieval_caches
 
-        clear_retrieval_caches()
-    except ImportError:
-        pass
+            clear_retrieval_caches()
+        except ImportError:
+            pass
     _rag_singleton.clear()
     _rag_singleton["key"] = cache_key
     try:

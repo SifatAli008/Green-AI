@@ -191,14 +191,19 @@ def format_biomedical_evidence(
 
 
 def clear_retrieval_caches() -> None:
-    """Drop BM25 + local CE caches when the chunk corpus object changes."""
+    """Drop BM25 cache when the chunk corpus object changes (keep cross-encoder)."""
+    _BM25_CACHE.clear()
+
+
+def clear_all_retrieval_caches() -> None:
+    """Drop BM25 + cross-encoder caches (rare; corpus or reranker model change)."""
     _CROSS_ENCODER_CACHE.clear()
     _BM25_CACHE.clear()
 
 
 def clear_cross_encoder_cache() -> None:
     """Backward-compatible alias."""
-    clear_retrieval_caches()
+    clear_all_retrieval_caches()
 
 
 def _bm25_for_corpus(texts: Sequence[str]) -> SimpleBM25:

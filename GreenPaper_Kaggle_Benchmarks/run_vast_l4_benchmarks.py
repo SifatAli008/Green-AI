@@ -742,10 +742,7 @@ def run_single_job(
         job.config_name,
     )
 
-    if job.use_rag:
-        pin_paper_rag_corpus(rag_index_dir)
-        prewarm_rag_index()
-    else:
+    if not job.use_rag:
         clear_rag_pins()
 
     _set_bootstrap_rng(seed)
@@ -1159,6 +1156,15 @@ def main() -> int:
             if not pending:
                 continue
 
+            rag_jobs = [j for _, j in pending if j.use_rag]
+            if rag_jobs:
+                pin_paper_rag_corpus(rag_index_dir)
+                prewarm_rag_index()
+                LOGGER.info(
+                    "RAG prewarmed once for %d RAG job(s) (embedder + reranker cached).",
+                    len(rag_jobs),
+                )
+
             model, tokenizer, q_backend = load_model_for_benchmark(
                 model_id,
                 use_unsloth=use_unsloth,
@@ -1169,6 +1175,8 @@ def main() -> int:
 
             try:
                 for job_index, job in pending:
+                    if not job.use_rag:
+                        clear_rag_pins()
                     LOGGER.info("[%d/%d] START %s", job_index, len(jobs), job.job_id)
                     try:
                         summary = run_single_job(
